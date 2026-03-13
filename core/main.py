@@ -170,10 +170,9 @@ def _run_scan(domain: str,
                     if file_path:
                         summary += f"\n📁 Saved: `{file_path}`"
                     discord_mod.send_enrichment_message(domain, {"summary": summary})
-                    # append portscan results to report
                     try:
                         reporting.append_section("Portscan Summary", summary)
-                        if file_path:
+                        if file_path and not enrich_flag:
                             reporting.attach_file_section("Portscan File", file_path)
                     except Exception:
                         pass

@@ -39,11 +39,20 @@ SCHED_LOCK = threading.Lock()
 
 
 def _safe_domain(value: str) -> str:
+    # Strip protocol if present
+    if "://" in value:
+        value = value.split("://")[1]
+    # Strip path and trailing slash
+    value = value.split("/")[0]
+    # Remove port if present
+    value = value.split(":")[0]
+    
     # Very basic sanitization: allow letters, digits, dot, dash
     import re
     if not value or not re.match(r"^[A-Za-z0-9\.-]+$", value):
         raise ValueError("invalid domain")
     return value
+
 
 
 def _build_cmd(domain: str, options: Dict[str, Any]):

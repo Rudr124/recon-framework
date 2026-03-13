@@ -1,0 +1,17 @@
+{
+  "id": "EXAMPLE-001",
+  "info": {
+    "name": "Example login page disclosure",
+    "description": "Detects a sample vulnerable string on the homepage"
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/",
+      "matchers": [
+        { "type": "word", "words": ["vulnerable string", "example vuln"] },
+        { "type": "regex", "regex": "CVE-\\d{4}-\\d{4,6}" }
+      ]
+    }
+  ]
+}

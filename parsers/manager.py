@@ -15,9 +15,6 @@ import core.utils as utils
 import core.reporting as reporting
 
 
-# ───────────────────────────────────────────────
-#  BASIC WHOIS / IP / ASN LOOKUP
-# ───────────────────────────────────────────────
 def ip_info(domain: str):
     """Resolve domain to IP and get ASN/org info via ipinfo.io (free API)."""
     try:

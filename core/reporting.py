@@ -1,12 +1,4 @@
-"""
-Run-level reporting utilities.
 
-Creates a single text report per scan run and provides helpers to append
-sections and optionally upload the final report to Discord.
-
-This is intentionally lightweight (plain text) for simplicity and wide
-compatibility.
-"""
 from typing import Optional
 import os
 from datetime import datetime
@@ -17,6 +9,8 @@ from . import config, utils, discord as discord_mod
 
 CURRENT_REPORT: Optional[str] = None
 CURRENT_DOMAIN: Optional[str] = None
+# track files already attached to the current report to avoid duplicates
+CURRENT_ATTACHED: set = set()
 
 
 def _report_filename(domain: str) -> str:
@@ -43,6 +37,12 @@ def start_report(domain: str) -> str:
             f.write("\n".join(header))
         CURRENT_REPORT = path
         CURRENT_DOMAIN = domain
+        # reset attached files registry
+        try:
+            global CURRENT_ATTACHED
+            CURRENT_ATTACHED = set()
+        except Exception:
+            pass
         utils.log(f"[REPORT] Started report → {path}", "info")
     except Exception as e:
         utils.log(f"[REPORT] Failed to create report file: {e}", "error")
@@ -78,10 +78,23 @@ def attach_file_section(title: str, filepath: str):
     if not filepath or not os.path.exists(filepath):
         append_section(title, f"(missing file) {filepath}")
         return None
+    # avoid attaching the same file multiple times
+    try:
+        abspath = os.path.abspath(filepath)
+        if abspath in CURRENT_ATTACHED:
+            # already attached; skip
+            return None
+    except Exception:
+        abspath = filepath
     try:
         with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
             content = fh.read()
-        return append_section(title, content)
+        out = append_section(title, content)
+        try:
+            CURRENT_ATTACHED.add(os.path.abspath(filepath))
+        except Exception:
+            pass
+        return out
     except Exception as e:
         utils.log(f"[REPORT] Failed to attach file {filepath}: {e}", "warn")
         return None
@@ -101,8 +114,6 @@ def finalize_report(upload: bool = True) -> Optional[str]:
     except Exception:
         pass
 
-    # attach other artifacts from the SAVE_DIR that match the domain OR are
-    # within a small time window around the report file (1 hour by default)
     try:
         files = []
         report_mtime = os.path.getmtime(path)
@@ -117,7 +128,6 @@ def finalize_report(upload: bool = True) -> Optional[str]:
             except Exception:
                 continue
             mtime = stat.st_mtime
-            # include if domain is in filename or mtime is within the window
             if (domain and domain in fname) or abs(mtime - report_mtime) <= time_window:
                 files.append(fname)
 

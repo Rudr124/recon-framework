@@ -1,12 +1,4 @@
-"""
-Usage:
- - Drop this plugin into `plugins/` (already done).
- - When `core.main` runs and plugins are loaded, this module will start any
-   previously-saved enabled jobs from `plugins/scheduler_jobs.json`.
- - When run via the plugin manager (it will be called with the target domain),
-   it will ask interactively whether to schedule recurring runs for that target
-   and create a job that spawns `run_recon.py <target>` every N hours.
-"""
+
 import os
 import sys
 import json
@@ -25,9 +17,6 @@ PLUGINS_DIR = os.path.dirname(__file__)
 JOBS_FILE = os.path.join(PLUGINS_DIR, "scheduler_jobs.json")
 RECON_SCRIPT = os.path.join(BASE_DIR, "run_recon.py")
 
-# Runtime registry of active job dicts keyed by target. This allows stop_job
-# to update the in-memory job object (so UI Stop takes effect immediately)
-# without requiring a process restart.
 RUNNING_JOBS: Dict[str, Dict[str, Any]] = {}
 
 
@@ -53,9 +42,7 @@ def _save_jobs(jobs: List[Dict[str, Any]]):
 def _spawn_recon(target: str, extra_args: List[str] = None):
     """Spawn a separate process to execute the recon run for `target`."""
     extra_args = extra_args or []
-    # First try to create the run via the webapp API so the job is tracked
-    # and its logs are streamed to the web UI. If the webapp isn't reachable,
-    # fallback to spawning a subprocess.
+   
     try:
         webapp_url = os.getenv("WEBAPP_URL", "http://127.0.0.1:5000").rstrip('/')
         payload = {
@@ -109,21 +96,17 @@ def _job_runner(job: Dict[str, Any]):
                     if elapsed < interval_seconds:
                         remaining = interval_seconds - elapsed
                         utils.log(f"[SCHED] Waiting {remaining}s until next run for {target}")
-                        # sleep in small chunks to be responsive to stop requests
                         chunk = 5
                         slept = 0
                         while slept < remaining and job.get('enabled', True):
                             time.sleep(min(chunk, remaining - slept))
                             slept += min(chunk, remaining - slept)
                 except Exception:
-                    # if parsing fails, fall back to immediate run
                     pass
 
-            # spawn recon in separate process
             _spawn_recon(target, extra_args=extra_args)
             job["last_run"] = datetime.utcnow().isoformat()
-            # persist updated last_run into the jobs file by replacing the
-            # matching job entry so restarts correctly respect the interval
+   
             try:
                 jobs = _load_jobs()
                 for j in jobs:
@@ -136,13 +119,8 @@ def _job_runner(job: Dict[str, Any]):
         except Exception as e:
             utils.log(f"[SCHED] Error executing job for {target}: {e}", "warn")
 
-        # Loop continues; next iteration will compute elapsed since last_run
-        # and wait the remaining interval if necessary. This avoids doubling
-        # the wait (waiting remaining before run and then the full interval
-        # after run).
 
     utils.log(f"[SCHED] Job runner stopped for {target}")
-    # cleanup runtime registry
     try:
         RUNNING_JOBS.pop(target, None)
     except Exception:
@@ -150,12 +128,10 @@ def _job_runner(job: Dict[str, Any]):
 
 
 def _start_job_thread(job: Dict[str, Any]):
-    # avoid starting duplicate threads for same job by adding a runtime marker
     if job.get("_thread_started"):
         return
     t = threading.Thread(target=_job_runner, args=(job,), daemon=True)
     job["_thread_started"] = True
-    # register running job so it can be controlled via stop_job()
     try:
         RUNNING_JOBS[job.get('target')] = job
     except Exception:
@@ -248,13 +224,11 @@ def run(target: str):
 
     job = add_job(target, hours, extra_args)
     utils.log(f"[SCHED] Scheduled {target} every {hours} hours. Saved to jobs file.")
-    # include the jobs file path in the return so reporting can attach it
     job_out = dict(job)
     job_out["jobs_file"] = JOBS_FILE
     return job_out
 
 
-# Start any saved jobs at import time
 try:
     start_all_jobs()
 except Exception:
