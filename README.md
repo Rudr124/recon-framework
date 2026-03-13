@@ -1,4 +1,3 @@
-# KALU | BHAI — Recon Framework
 
 Lightweight OSINT/recon tool (subdomain enumeration, Wayback scanning, enrichment). This README explains how to configure the project using a `.env` file, install dependencies, and run the core runner on Windows PowerShell.
 

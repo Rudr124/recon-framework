@@ -37,18 +37,13 @@ OTX_KEY = os.getenv("OTX_KEY", "")
 SHODAN_KEY = os.getenv("SHODAN_KEY", "")
 VIRUSTOTAL_KEY = os.getenv("VIRUSTOTAL_KEY", "")
 URLSCAN_KEY = os.getenv("URLSCAN_KEY", "")
-# ───────────────────────────────────────────────
-#  SETTINGS
-# ───────────────────────────────────────────────
+
 MAX_WORKERS = 50               # concurrent threads
 REQUEST_TIMEOUT = 20           # seconds
 USER_AGENT = "KALU-BHAI/1.0"
-# primary save directory used by utils
 SAVE_DIR = "output"
-# keep legacy name for compatibility
 OUTPUT_DIR = SAVE_DIR
 
-# Notification control: set to False to suppress "no results" notifications
 ALLOW_EMPTY_NOTIFICATIONS = True
 
 # Test mode disables external posting and may enable test-only behavior
