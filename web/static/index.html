@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>KALU | BHAI — Terminal UI</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+*{
+  box-sizing: border-box;
+}
+
+body{
+  margin:0;
+  font-family:'Share Tech Mono', monospace;
+  background:#000;
+  color:#00ff9f;
+  overflow:auto; /* allow full-page scrolling */
+}
+
+/* MATRIX BACKGROUND */
+canvas{
+  position:fixed;
+  top:0;
+  left:0;
+  z-index:-1;
+}
+
+/* TERMINAL CONTAINER */
+.wrapper{
+  padding:20px;
+  min-height:100vh;
+  max-width:1100px;
+  margin:20px auto;
+  display:flex;
+  flex-direction:column;
+  backdrop-filter: blur(2px);
+}
+
+/* HEADER */
+h2{
+  text-align:center;
+  color:#00ff9f;
+  text-shadow:0 0 8px #00ff9f;
+  margin-bottom:20px;
+}
+
+/* CONTROLS */
+.controls{
+  display:flex;
+  gap:10px;
+  margin-bottom:15px;
+}
+
+input{
+  flex:1;
+  background:#000;
+  border:1px solid #00ff9f;
+  color:#00ff9f;
+  padding:8px;
+  outline:none;
+}
+
+input:focus{
+  box-shadow:0 0 8px #00ff9f;
+}
+
+button{
+  background:#000;
+  border:1px solid #00ff9f;
+  color:#00ff9f;
+  padding:8px 14px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:hover{
+  background:#00ff9f;
+  color:#000;
+  box-shadow:0 0 10px #00ff9f;
+}
+
+/* LOGS */
+#logs{
+  /* fixed-height terminal panel that scrolls independently */
+  height: calc(68vh - 140px);
+  background:rgba(0,0,0,0.8);
+  border:1px solid #00ff9f;
+  padding:10px;
+  overflow:auto;
+  font-size:14px;
+  white-space:pre-wrap;
+  box-shadow:0 0 15px #00ff9f inset;
+}
+
+/* JOBS */
+.jobs{
+  margin-top:15px;
+  border-top:1px solid #00ff9f;
+  padding-top:10px;
+}
+
+.jobs h3{
+  margin:5px 0;
+  text-shadow:0 0 6px #00ff9f;
+}
+
+#jobs_list{
+  list-style:none;
+  padding:0;
+  margin:0;
+}
+
+#jobs_list li{
+  padding:6px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(0,255,159,0.2);
+  transition:0.2s;
+}
+
+#jobs_list li:hover{
+  background:rgba(0,255,159,0.1);
+  box-shadow:0 0 5px #00ff9f;
+}
+
+/* SCANLINE EFFECT */
+body::after{
+  content:"";
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.15) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div class="wrapper">
+  <h2>> KALU | BHAI — CYBER TERMINAL</h2>
+
+  <div class="controls">
+    <input id="domain" placeholder="target-domain.com" />
+    <button id="start">▶ INIT SCAN</button>
+    <button id="refresh">⟳ REFRESH</button>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+    <label style="font-size:13px"><input type="checkbox" id="opt_enrich"> Enrich</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_subs"> Subs</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_no_wayback"> No-Wayback</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_no_discord"> No-Discord</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_test"> Test</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_verbose"> Verbose</label>
+    <label style="font-size:13px"><input type="checkbox" id="opt_no_banner"> No-Banner</label>
+    <label style="font-size:13px">Schedule every <input id="sched_interval" type="number" min="0" step="1" style="width:60px;margin-left:6px" placeholder="hrs"> hrs</label>
+  </div>
+
+  <pre id="logs"></pre>
+
+  <div class="jobs">
+    <h3>> ACTIVE JOBS</h3>
+    <ul id="jobs_list"></ul>
+  </div>
+  <div class="jobs" style="margin-top:10px;">
+    <h3>> SCHEDULERS</h3>
+    <ul id="schedulers_list"></ul>
+  </div>
+  <div class="jobs" style="margin-top:10px;">
+    <h3>> REPORTS</h3>
+    <ul id="reports_list"></ul>
+  </div>
+</div>
+
+<script>
+/* MATRIX EFFECT */
+const canvas = document.getElementById("matrix");
+const ctx = canvas.getContext("2d");
+
+canvas.height = window.innerHeight;
+canvas.width = window.innerWidth;
+
+const letters = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const fontSize = 14;
+const columns = canvas.width / fontSize;
+const drops = [];
+
+for(let x=0; x<columns; x++) drops[x] = 1;
+
+function draw(){
+  ctx.fillStyle = "rgba(0,0,0,0.05)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = "#00ff9f";
+  ctx.font = fontSize + "px monospace";
+
+  for(let i=0; i<drops.length; i++){
+    const text = letters[Math.floor(Math.random()*letters.length)];
+    ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+
+    if(drops[i]*fontSize > canvas.height && Math.random() > 0.975)
+      drops[i] = 0;
+
+    drops[i]++;
+  }
+}
+setInterval(draw, 33);
+
+/* YOUR ORIGINAL JS LOGIC */
+const startBtn = document.getElementById('start');
+const domainInput = document.getElementById('domain');
+const logs = document.getElementById('logs');
+const jobsList = document.getElementById('jobs_list');
+const refreshBtn = document.getElementById('refresh');
+
+let currentEventSource = null;
+let lastWatchedJob = null;
+
+function appendLog(line){
+  logs.textContent += line + '\n';
+  logs.scrollTop = logs.scrollHeight;
+}
+
+startBtn.onclick = async () => {
+  const domain = domainInput.value.trim();
+  if(!domain){ alert('Enter domain'); return; }
+  appendLog('[+] Initializing scan for ' + domain);
+  // Build options from the UI
+  const options = {
+    enrich: document.getElementById('opt_enrich').checked,
+    subs: document.getElementById('opt_subs').checked,
+    no_wayback: document.getElementById('opt_no_wayback').checked,
+    no_discord: document.getElementById('opt_no_discord').checked,
+    test: document.getElementById('opt_test').checked,
+    verbose: document.getElementById('opt_verbose').checked,
+    no_banner: document.getElementById('opt_no_banner').checked,
+  };
+  const sched = parseFloat(document.getElementById('sched_interval').value || 0) || 0;
+  const body = { domain: domain, options: options };
+  if(sched > 0){ body.schedule = { interval_hours: sched }; appendLog('[+] Scheduling recurring run every ' + sched + ' hour(s)'); }
+
+  const res = await fetch('/api/scan', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+
+  if(res.status === 202){
+    const data = await res.json();
+    if(data.job_id){
+      const job = data.job_id;
+      appendLog('[+] Job queued: ' + job);
+      // wait until the job is registered and has a status endpoint before opening logs
+      (async function waitAndWatch(id){
+        const maxWait = 10; // seconds
+        const start = Date.now();
+        while(true){
+          try{
+            const sres = await fetch(`/api/scan/${id}/status`);
+            if(sres.status === 200){
+              watchLogs(id);
+              break;
+            }
+          }catch(e){/* ignore transient */}
+          if((Date.now()-start)/1000 > maxWait){
+            appendLog('[!] Timeout waiting for job; opening logs anyway');
+            watchLogs(id);
+            break;
+          }
+          await new Promise(r=>setTimeout(r, 400));
+        }
+      })(job);
+      setTimeout(fetchJobs, 500);
+    } else if(data.scheduler_id){
+      appendLog('[+] Scheduler created: ' + data.scheduler_id);
+      // refresh scheduler list in UI
+      setTimeout(fetchSchedulers, 300);
+    } else {
+      appendLog('[!] Unknown response: ' + JSON.stringify(data));
+    }
+  } else {
+    const err = await res.text();
+    appendLog('[!] Failed: ' + err);
+  }
+};
+
+refreshBtn.onclick = fetchJobs;
+
+async function fetchJobs(){
+  const res = await fetch('/api/jobs');
+  const data = await res.json();
+  jobsList.innerHTML = '';
+  const now = Date.now();
+  for(const j of data){
+    const li = document.createElement('li');
+    // compute elapsed if running
+    let status = j.status || 'unknown';
+    let extra = '';
+    if(j.start_time && status === 'running'){
+      try{
+        const started = new Date(j.start_time).getTime();
+        const elapsed = Math.floor((now - started)/1000);
+        extra = ` — elapsed ${elapsed}s`;
+      }catch(e){}
+    }
+
+    // job text
+    const txt = document.createElement('span');
+    txt.textContent = `${j.job_id} — ${j.domain} — ${status}${extra}`;
+    if(status === 'running') txt.style.fontWeight = '700';
+    li.appendChild(txt);
+
+    // Kill button for active jobs (running/queued/etc.)
+    const activeStates = ['running','queued','unknown'];
+    if(j.job_id && !['finished','failed','terminated'].includes(status)){
+      const kill = document.createElement('button');
+      kill.textContent = '✖ KILL';
+      kill.style.marginLeft = '12px';
+      kill.style.border = '1px solid #ff3b3b';
+      kill.style.background = '#000';
+      kill.style.color = '#ff3b3b';
+      kill.onclick = async (ev) => {
+        ev.stopPropagation();
+        try{
+          appendLog('[!] Sending kill to ' + j.job_id);
+          const res = await fetch(`/api/scan/${j.job_id}/stop`, { method: 'POST' });
+          if(res.ok){
+            const data = await res.json().catch(()=>null);
+            appendLog('[+] Kill request acknowledged: ' + (data ? JSON.stringify(data) : 'ok'));
+          } else {
+            const text = await res.text().catch(()=>'<no-text>');
+            appendLog('[!] Kill failed: ' + text);
+          }
+        }catch(e){
+          appendLog('[!] Kill error: ' + e);
+        }
+        // remove last_job_id if it refers to this job, and close stream if open
+        try{ if(localStorage.getItem('last_job_id') === j.job_id) localStorage.removeItem('last_job_id'); }catch(e){}
+        if(lastWatchedJob === j.job_id && currentEventSource){ try{ currentEventSource.close(); }catch(e){} currentEventSource = null; lastWatchedJob = null; }
+        setTimeout(fetchJobs, 300);
+      };
+      li.appendChild(kill);
+    }
+
+    // clicking the list item opens logs
+    li.onclick = () => { if(j.job_id) watchLogs(j.job_id); };
+    jobsList.appendChild(li);
+  }
+}
+
+async function fetchSchedulers(){
+  const res = await fetch('/api/schedulers');
+  const data = await res.json();
+  const schedList = document.getElementById('schedulers_list');
+  schedList.innerHTML = '';
+  for(const s of data){
+    const li = document.createElement('li');
+    li.textContent = `${s.scheduler_id} — ${s.domain} — every ${s.interval_hours}h`;
+    const stop = document.createElement('button');
+    stop.textContent = 'Stop';
+    stop.style.marginLeft = '10px';
+    stop.onclick = async (ev) => {
+      ev.stopPropagation();
+      await fetch(`/api/schedulers/${s.scheduler_id}/stop`, {method:'POST'});
+      appendLog('[+] Stopped scheduler ' + s.scheduler_id);
+      setTimeout(fetchSchedulers, 300);
+    };
+    li.appendChild(stop);
+    schedList.appendChild(li);
+  }
+}
+
+function watchLogs(job_id){
+  if(!job_id){
+    appendLog('[!] No job id to watch');
+    return;
+  }
+  if(currentEventSource){
+    try{ currentEventSource.close(); }catch(e){}
+    currentEventSource = null;
+    lastWatchedJob = null;
+  }
+  // try opening the EventSource but handle transient 404s by retrying a few times
+  // remember last watched job so a page reload can restore the terminal
+  try{ localStorage.setItem('last_job_id', job_id); }catch(e){}
+  logs.textContent = '';
+  let attempts = 0;
+  const tryOpen = () => {
+    attempts++;
+    const es = new EventSource(`/api/scan/${job_id}/logs`);
+    currentEventSource = es;
+
+    es.onmessage = function(e){
+        if(e.data === '__DONE__'){
+          appendLog('[✓] JOB FINISHED');
+          try{ es.close(); }catch(e){}
+          currentEventSource = null;
+          lastWatchedJob = null;
+          fetchJobs();
+          return;
+        }
+      appendLog(e.data);
+    };
+
+    es.onerror = function(ev){
+      // if server returned 404 quickly, EventSource may error; retry a couple times
+      appendLog('[!] Log stream error (attempt ' + attempts + ')');
+  try{ es.close(); }catch(e){}
+  currentEventSource = null;
+  lastWatchedJob = null;
+      if(attempts < 5){
+        setTimeout(tryOpen, 500);
+      } else {
+        appendLog('[!] Connection closed');
+      }
+    };
+  };
+  tryOpen();
+}
+
+// initial fetches
+fetchJobs();
+fetchSchedulers();
+fetchReports();
+
+// Attempt to restore the last-watched job on page load so the terminal
+// isn't blank after a reload. We prefer the saved job id in localStorage;
+// if it exists and the server still recognizes it, re-open its log stream.
+async function tryRestoreLastJob(){
+  try{
+    const last = localStorage.getItem('last_job_id');
+    if(!last) return;
+    // check status endpoint
+    const res = await fetch(`/api/scan/${last}/status`);
+    if(res.status === 200){
+      appendLog('[+] Restoring logs for job ' + last);
+      watchLogs(last);
+      return;
+    }
+    // if job not found, clear stored id
+    localStorage.removeItem('last_job_id');
+  }catch(e){
+    // ignore transient errors
+  }
+}
+
+// also try to auto-attach to any running job if no saved job is found
+async function tryAttachRunningJob(){
+  try{
+    const res = await fetch('/api/jobs');
+    if(!res.ok) return;
+    const data = await res.json();
+    for(const j of data){
+      if(j.status === 'running'){
+        appendLog('[+] Auto-attaching to running job ' + j.job_id);
+        try{ localStorage.setItem('last_job_id', j.job_id); }catch(e){}
+        watchLogs(j.job_id);
+        return;
+      }
+    }
+  }catch(e){ }
+}
+
+// run restore attempts after a short delay so initial fetches populate lists
+setTimeout(async ()=>{ await tryRestoreLastJob(); await tryAttachRunningJob(); }, 400);
+
+// poll jobs every 5s so UI shows status/elapsed
+setInterval(fetchJobs, 5000);
+setInterval(fetchSchedulers, 10000);
+setInterval(fetchReports, 15000);
+
+async function fetchReports(){
+  const res = await fetch('/api/reports');
+  if(!res.ok) return;
+  const data = await res.json();
+  const reportsList = document.getElementById('reports_list');
+  reportsList.innerHTML = '';
+  for(const r of data){
+    const li = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = `/api/reports/${encodeURIComponent(r.name)}`;
+    link.textContent = `${r.name} (${Math.round(r.size/1024)} KB)`;
+    link.target = '_blank';
+    li.appendChild(link);
+    reportsList.appendChild(li);
+  }
+}
+</script>
+
+</body>
+</html>
