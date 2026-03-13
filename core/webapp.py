@@ -110,7 +110,6 @@ def _start_process_for_job(job_id: str):
     job['pid'] = proc.pid
     job['start_time'] = datetime.utcnow().isoformat()
 
-    # Reader thread: push lines to the job queue and keep a small buffer
     def reader():
         try:
             for line in proc.stdout:
