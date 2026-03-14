@@ -40,7 +40,7 @@ URLSCAN_KEY = os.getenv("URLSCAN_KEY", "")
 
 MAX_WORKERS = 50               # concurrent threads
 REQUEST_TIMEOUT = 20           # seconds
-USER_AGENT = "KALU-BHAI/1.0"
+USER_AGENT = "PrecoNng/1.0"
 SAVE_DIR = "output"
 OUTPUT_DIR = SAVE_DIR
 
