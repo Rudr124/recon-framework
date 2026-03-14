@@ -26,7 +26,7 @@ def start_report(domain: str) -> str:
     fname = _report_filename(domain)
     path = os.path.join(config.SAVE_DIR, fname)
     header = [
-        "KALU | BHAI — RUN REPORT",
+        "PrecoNng — RUN REPORT",
         f"Target: {domain}",
         f"Started: {datetime.utcnow().isoformat()} UTC",
         "=" * 60,
